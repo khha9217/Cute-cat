@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>قطتي الجميلة - لعبة تلبيس</title>
+<style>
+  :root{
+    --pink:#ff7eb6; --pink-d:#e0559a; --bg:#fff0f7; --card:#ffffff; --ink:#5a2a4a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",Tahoma,"Noto Sans Arabic",Arial,sans-serif;}
+  body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 12px 24px}
+  h1{margin:4px 0 8px;font-size:22px;color:var(--pink-d);text-align:center}
+  #stage{width:100%;max-width:360px;background:var(--card);border-radius:24px;
+    box-shadow:0 8px 24px rgba(224,85,154,.25);overflow:hidden;border:4px solid #ffd3e8}
+  #stage svg{display:block;width:100%;height:auto}
+  .tabs{display:flex;gap:6px;margin:14px 0 8px;flex-wrap:wrap;justify-content:center;max-width:420px}
+  .tab{border:0;background:#ffe0ef;color:var(--ink);padding:9px 14px;border-radius:999px;
+    font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+  .tab.active{background:var(--pink);color:#fff;box-shadow:0 3px 0 var(--pink-d)}
+  .options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:420px}
+  .opt{border:3px solid transparent;background:#fff;border-radius:16px;padding:10px 4px;
+    font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit;
+    box-shadow:0 2px 6px rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:center;gap:4px}
+  .opt .ico{font-size:28px;line-height:1}
+  .opt.sel{border-color:var(--pink);background:#fff5fa}
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center}
+  .btn{border:0;padding:12px 20px;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;
+    font-family:inherit;color:#fff;background:var(--pink);box-shadow:0 4px 0 var(--pink-d)}
+  .btn.alt{background:#9b7bff;box-shadow:0 4px 0 #7656e0}
+  .btn.gr{background:#3bbf8a;box-shadow:0 4px 0 #26956a}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+  .sp{animation:pop .5s ease}
+  @keyframes pop{0%{transform:scale(.97)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#5a2a4a;color:#fff;
+    padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<h1>🐱 قطتي الجميلة</h1>
+<div id="stage"><svg id="scene" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+<div class="tabs" id="tabs"></div>
+<div class="options" id="options"></div>
+
+<div class="actions">
+  <button class="btn alt" id="rand">🎲 عشوائي</button>
+  <button class="btn gr" id="save">📸 حفظ الصورة</button>
+  <button class="btn" id="reset">🔄 من الأول</button>
+</div>
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+
+  /* ---------- الخلفيات ---------- */
+  var backgrounds = [
+    {id:"pinkhearts", name:"قلوب", ico:"💖", svg:function(){
+      var h="";
+      var pts=[[40,50,18],[250,70,14],[60,330,12],[240,300,16],[150,30,10],[270,200,12],[30,190,14]];
+      pts.forEach(function(p){h+='<text x="'+p[0]+'" y="'+p[1]+'" font-size="'+(p[2]*1.6)+'" text-anchor="middle">💗</text>';});
+      return '<defs><linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd1e8"/><stop offset="1" stop-color="#ffeef7"/></linearGradient></defs><rect width="300" height="400" fill="url(#bg1)"/>'+h+'<rect y="345" width="300" height="55" fill="#ffc2de"/>';
+    }},
+    {id:"sky", name:"سما", ico:"☁️", svg:function(){
+      return '<defs><linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd3ff"/><stop offset="1" stop-color="#e3f6ff"/></linearGradient></defs><rect width="300" height="400" fill="url(#bg2)"/>'+
+        '<g fill="#fff"><ellipse cx="60" cy="70" rx="38" ry="16"/><ellipse cx="85" cy="60" rx="26" ry="14"/><ellipse cx="240" cy="120" rx="40" ry="16"/><ellipse cx="215" cy="110" rx="24" ry="13"/></g>'+
+        '<rect y="345" width="300" height="55" fill="#c9f0c0"/>';
+    }},
+    {id:"garden", name:"حديقة", ico:"🌸", svg:function(){
+      var f="";
+      [[30,360],[80,375],[220,365],[270,378],[130,385],[185,380]].forEach(function(p){
+        f+='<text x="'+p[0]+'" y="'+p[1]+'" font-size="26" text-anchor="middle">🌷</text>';
+      });
+      return '<defs><linearGradient id="bg3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c7f0ff"/><stop offset="1" stop-color="#e9ffe0"/></linearGradient></defs><rect width="300" height="400" fill="url(#bg3)"/>'+
+        '<circle cx="245" cy="60" r="30" fill="#ffe27a"/><rect y="335" width="300" height="65" fill="#9fe08a"/>'+f;
+    }},
+    {id:"night", name:"ليل", ico:"🌙", svg:function(){
+      var s="";
+      [[40,50],[90,100],[150,40],[210,90],[260,50],[30,160],[270,170],[120,150],[230,20]].forEach(function(p,i){
+        s+='<text x="'+p[0]+'" y="'+p[1]+'" font-size="'+(12+(i%3)*5)+'" text-anchor="middle" fill="#fff">✦</text>';
+      });
+      return '<defs><linearGradient id="bg4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2a6b"/><stop offset="1" stop-color="#7a5bb5"/></linearGradient></defs><rect width="300" height="400" fill="url(#bg4)"/>'+s+
+        '<text x="240" y="85" font-size="46" text-anchor="middle">🌙</text><rect y="345" width="300" height="55" fill="#4a3d8f"/>';
+    }},
+    {id:"beach", name:"شاطئ", ico:"🏖️", svg:function(){
+      return '<defs><linearGradient id="bg5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9ee6ff"/><stop offset="1" stop-color="#d6f6ff"/></linearGradient></defs><rect width="300" height="400" fill="url(#bg5)"/>'+
+        '<circle cx="50" cy="55" r="28" fill="#ffe27a"/><rect y="250" width="300" height="60" fill="#4fc3f7"/>'+
+        '<path d="M0 262 Q40 250 80 262 T160 262 T240 262 T320 262" stroke="#fff" stroke-width="4" fill="none"/>'+
+        '<rect y="320" width="300" height="80" fill="#ffe9b0"/><text x="250" y="350" font-size="30">🐚</text><text x="40" y="375" font-size="26">⭐</text>';
+    }}
+  ];
+
+  /* ---------- الفساتين ---------- */
+  function dressShape(fill, extra){
+    return '<path d="M108 205 Q150 192 192 205 L228 338 Q150 356 72 338 Z" fill="'+fill+'" stroke="rgba(0,0,0,.12)" stroke-width="2"/>'+
+           '<path d="M112 208 Q150 220 188 208" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="3"/>'+(extra||"");
+  }
+  var dresses = [
+    {id:"none", name:"بدون", ico:"🚫", svg:function(){return "";}},
+    {id:"pink", name:"وردي", ico:"👗", svg:function(){
+      var d=""; [[130,260],[170,290],[110,310],[190,250],[150,320],[200,320],[100,270]].forEach(function(p){d+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="5" fill="#fff"/>';});
+      return dressShape("#ff8fc2",d);}},
+    {id:"purple", name:"بنفسجي", ico:"💜", svg:function(){
+      return dressShape("#b79bff",'<path d="M80 330 Q150 345 220 330" stroke="#fff" stroke-width="5" fill="none" stroke-dasharray="2 8" stroke-linecap="round"/><text x="150" y="285" font-size="34" text-anchor="middle">⭐</text>');}},
+    {id:"blue", name:"أزرق", ico:"💙", svg:function(){
+      return dressShape("#6fc3ff",'<path d="M75 300 Q150 320 225 300" stroke="#fff" stroke-width="6" fill="none"/><path d="M82 322 Q150 342 218 322" stroke="#fff" stroke-width="4" fill="none"/>');}},
+    {id:"yellow", name:"أصفر", ico:"💛", svg:function(){
+      var d=""; [[120,270],[180,270],[150,300],[110,320],[190,320]].forEach(function(p){d+='<text x="'+p[0]+'" y="'+p[1]+'" font-size="22" text-anchor="middle">🌼</text>';});
+      return dressShape("#ffe27a",d);}},
+    {id:"red", name:"أحمر", ico:"❤️", svg:function(){
+      return dressShape("#ff6b81",'<text x="150" y="290" font-size="46" text-anchor="middle">💖</text><rect x="104" y="215" width="92" height="10" rx="5" fill="#fff" opacity=".7"/>');}},
+    {id:"mint", name:"نعناعي", ico:"💚", svg:function(){
+      return dressShape("#8de6c4",'<path d="M150 205 L150 345" stroke="#fff" stroke-width="3" stroke-dasharray="4 7" opacity=".8"/><path d="M110 330 L190 330" stroke="#fff" stroke-width="4" opacity=".8"/>');}}
+  ];
+
+  /* ---------- الأغطية والتيجان ---------- */
+  var hats = [
+    {id:"none", name:"بدون", ico:"🚫", svg:function(){return "";}},
+    {id:"crown", name:"تاج", ico:"👑", svg:function(){
+      return '<path d="M104 82 L112 46 L132 68 L150 38 L168 68 L188 46 L196 82 Z" fill="#ffd54a" stroke="#d9a400" stroke-width="3" stroke-linejoin="round"/>'+
+             '<circle cx="150" cy="56" r="5" fill="#ff5c8a"/><circle cx="118" cy="62" r="4" fill="#6fc3ff"/><circle cx="182" cy="62" r="4" fill="#6fc3ff"/>';}},
+    {id:"flowers", name:"ورد", ico:"🌺", svg:function(){
+      var s=""; [[108,80],[128,66],[150,60],[172,66],[192,80]].forEach(function(p,i){
+        s+='<text x="'+p[0]+'" y="'+p[1]+'" font-size="'+(i==2?30:24)+'" text-anchor="middle">'+(i%2?"🌸":"🌺")+'</text>';}); return s;}},
+    {id:"party", name:"حفلة", ico:"🎉", svg:function(){
+      return '<path d="M150 8 L120 80 L180 80 Z" fill="#ff8fc2" stroke="#e0559a" stroke-width="3" stroke-linejoin="round"/>'+
+             '<circle cx="150" cy="8" r="7" fill="#ffe27a"/><path d="M132 52 L168 52 M126 66 L174 66" stroke="#fff" stroke-width="4"/>';}},
+    {id:"bow", name:"فيونكة", ico:"🎀", svg:function(){
+      return '<path d="M150 70 L106 48 Q96 70 106 92 Z" fill="#ff5c9a" stroke="#c93a78" stroke-width="2.5"/>'+
+             '<path d="M150 70 L194 48 Q204 70 194 92 Z" fill="#ff5c9a" stroke="#c93a78" stroke-width="2.5"/>'+
+             '<circle cx="150" cy="70" r="9" fill="#ff8fc2" stroke="#c93a78" stroke-width="2.5"/>';}},
+    {id:"beret", name:"قبعة", ico:"🧢", svg:function(){
+      return '<ellipse cx="146" cy="76" rx="52" ry="22" fill="#9b7bff" stroke="#7656e0" stroke-width="3"/><circle cx="146" cy="52" r="5" fill="#7656e0"/>';}}
+  ];
+
+  /* ---------- الإكسسوارات ---------- */
+  var extras = [
+    {id:"none", name:"بدون", ico:"🚫", svg:function(){return "";}},
+    {id:"glasses", name:"نضارة", ico:"😎", svg:function(){
+      return '<g fill="#ff5c9a" fill-opacity=".85" stroke="#c93a78" stroke-width="2">'+
+        '<path d="M112 128 q0 -14 14 -14 q10 0 13 8 q3 -8 13 -8 q14 0 14 14 q0 14 -27 28 q-27 -14 -27 -28z" transform="translate(-14 0) scale(.82) translate(32 20)"/>'+
+        '<path d="M112 128 q0 -14 14 -14 q10 0 13 8 q3 -8 13 -8 q14 0 14 14 q0 14 -27 28 q-27 -14 -27 -28z" transform="translate(92 0) scale(.82) translate(-32 20)"/></g>';}},
+    {id:"pearls", name:"عقد", ico:"📿", svg:function(){
+      var s=""; for(var i=0;i<9;i++){var t=i/8, x=112+t*76, y=196+Math.sin(t*Math.PI)*16; s+='<circle cx="'+x+'" cy="'+y+'" r="5.5" fill="#fff" stroke="#e5c7d8" stroke-width="1.5"/>';} return s;}},
+    {id:"wings", name:"أجنحة", ico:"🦋", svg:function(){
+      return '<g fill="#ffd1f0" stroke="#e08bc7" stroke-width="2.5" opacity=".95" class="wings">'+
+        '<path d="M96 230 Q30 170 40 250 Q50 300 96 270 Z"/><path d="M204 230 Q270 170 260 250 Q250 300 204 270 Z"/></g>';}, behind:true},
+    {id:"wand", name:"عصاية", ico:"🪄", svg:function(){
+      return '<line x1="214" y1="320" x2="262" y2="236" stroke="#c98a3c" stroke-width="6" stroke-linecap="round"/>'+
+             '<text x="262" y="236" font-size="34" text-anchor="middle">⭐</text>';}},
+    {id:"scarf", name:"وشاح", ico:"🧣", svg:function(){
+      return '<path d="M104 192 Q150 214 196 192 L198 210 Q150 232 102 210 Z" fill="#6fc3ff" stroke="#3e97d6" stroke-width="2.5"/>'+
+             '<path d="M170 212 L184 262 L166 258 L158 216 Z" fill="#6fc3ff" stroke="#3e97d6" stroke-width="2.5"/>';}}
+  ];
+
+  /* ---------- القطة (تصميم أصلي) ---------- */
+  function catBase(){
+    var outline="#e6cddd";
+    return ''+
+      /* الذيل */
+      '<path d="M214 300 Q290 280 272 205 Q268 190 254 200 Q262 245 205 262 Z" fill="#fff" stroke="'+outline+'" stroke-width="3"/>'+
+      /* الجسم */
+      '<ellipse cx="150" cy="270" rx="56" ry="72" fill="#fff" stroke="'+outline+'" stroke-width="3"/>'+
+      /* الأرجل */
+      '<ellipse cx="122" cy="345" rx="22" ry="13" fill="#fff" stroke="'+outline+'" stroke-width="3"/>'+
+      '<ellipse cx="178" cy="345" rx="22" ry="13" fill="#fff" stroke="'+outline+'" stroke-width="3"/>'+
+      '<g fill="#ffd0e3"><circle cx="122" cy="347" r="5"/><circle cx="178" cy="347" r="5"/></g>';
+  }
+  function catHead(){
+    var outline="#e6cddd";
+    return ''+
+      /* الودان */
+      '<path d="M86 98 L92 28 L138 66 Z" fill="#fff" stroke="'+outline+'" stroke-width="3" stroke-linejoin="round"/>'+
+      '<path d="M214 98 L208 28 L162 66 Z" fill="#fff" stroke="'+outline+'" stroke-width="3" stroke-linejoin="round"/>'+
+      '<path d="M96 88 L99 48 L126 70 Z" fill="#ffc2da"/><path d="M204 88 L201 48 L174 70 Z" fill="#ffc2da"/>'+
+      /* الراس */
+      '<ellipse cx="150" cy="128" rx="68" ry="62" fill="#fff" stroke="'+outline+'" stroke-width="3"/>'+
+      /* العيون */
+      '<ellipse cx="124" cy="126" rx="13" ry="16" fill="#3a2a4a"/><ellipse cx="176" cy="126" rx="13" ry="16" fill="#3a2a4a"/>'+
+      '<ellipse cx="124" cy="126" rx="10" ry="13" fill="#5cb8ff"/><ellipse cx="176" cy="126" rx="10" ry="13" fill="#5cb8ff"/>'+
+      '<ellipse cx="124" cy="127" rx="6" ry="9" fill="#1d1230"/><ellipse cx="176" cy="127" rx="6" ry="9" fill="#1d1230"/>'+
+      '<circle cx="120" cy="120" r="4" fill="#fff"/><circle cx="172" cy="120" r="4" fill="#fff"/>'+
+      '<circle cx="128" cy="132" r="2" fill="#fff"/><circle cx="180" cy="132" r="2" fill="#fff"/>'+
+      /* خدود */
+      '<ellipse cx="98" cy="150" rx="12" ry="7" fill="#ffb6d1" opacity=".75"/><ellipse cx="202" cy="150" rx="12" ry="7" fill="#ffb6d1" opacity=".75"/>'+
+      /* الانف والفم */
+      '<path d="M143 146 L157 146 L150 154 Z" fill="#ff8fb3" stroke="#e0709a" stroke-width="1.5" stroke-linejoin="round"/>'+
+      '<path d="M150 154 L150 160 M150 160 Q142 170 134 162 M150 160 Q158 170 166 162" fill="none" stroke="#c9729a" stroke-width="2.2" stroke-linecap="round"/>'+
+      /* شنب */
+      '<g stroke="#d9bccf" stroke-width="2" stroke-linecap="round">'+
+      '<path d="M70 144 L100 150"/><path d="M68 158 L100 158"/><path d="M230 144 L200 150"/><path d="M232 158 L200 158"/></g>';
+  }
+
+  /* ---------- الحالة والرسم ---------- */
+  var cats = {bg:backgrounds, dress:dresses, hat:hats, extra:extras};
+  var tabsDef = [
+    {key:"bg", label:"🖼️ خلفية"},
+    {key:"dress", label:"👗 فستان"},
+    {key:"hat", label:"👑 رأس"},
+    {key:"extra", label:"✨ إكسسوار"}
+  ];
+  var defaults = {bg:0, dress:1, hat:1, extra:0};
+  var state = {}, activeTab = "dress";
+  function resetState(){ for(var k in defaults) state[k]=defaults[k]; }
+  resetState();
+
+  var scene = document.getElementById("scene");
+  function pick(key){ return cats[key][state[key]]; }
+
+  function render(pop){
+    var ex = pick("extra");
+    var html = pick("bg").svg();
+    if(ex.behind) html += ex.svg();
+    html += catBase();
+    html += pick("dress").svg();
+    if(!ex.behind) html += ex.svg();
+    html += catHead();
+    html += pick("hat").svg();
+    scene.innerHTML = html;
+    if(pop){ scene.classList.remove("sp"); void scene.getBoundingClientRect(); scene.classList.add("sp"); }
+  }
+
+  var tabsEl = document.getElementById("tabs");
+  var optsEl = document.getElementById("options");
+
+  function buildTabs(){
+    tabsEl.innerHTML="";
+    tabsDef.forEach(function(t){
+      var b=document.createElement("button");
+      b.className="tab"+(t.key===activeTab?" active":"");
+      b.textContent=t.label;
+      b.onclick=function(){activeTab=t.key;buildTabs();buildOptions();};
+      tabsEl.appendChild(b);
+    });
+  }
+  function buildOptions(){
+    optsEl.innerHTML="";
+    cats[activeTab].forEach(function(o,i){
+      var b=document.createElement("button");
+      b.className="opt"+(state[activeTab]===i?" sel":"");
+      b.innerHTML='<span class="ico">'+o.ico+'</span><span>'+o.name+'</span>';
+      b.onclick=function(){state[activeTab]=i;render(true);buildOptions();beep(520+i*60);};
+      optsEl.appendChild(b);
+    });
+  }
+
+  /* صوت بسيط */
+  var actx=null;
+  function beep(freq){
+    try{
+      actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+      var o=actx.createOscillator(), g=actx.createGain();
+      o.type="sine"; o.frequency.value=freq; g.gain.value=.06;
+      o.connect(g); g.connect(actx.destination);
+      o.start(); g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime+.18);
+      o.stop(actx.currentTime+.2);
+    }catch(e){}
+  }
+
+  var toastEl=document.getElementById("toast"), tt;
+  function toast(m){toastEl.textContent=m;toastEl.classList.add("show");clearTimeout(tt);tt=setTimeout(function(){toastEl.classList.remove("show");},1800);}
+
+  document.getElementById("rand").onclick=function(){
+    for(var k in cats){ state[k]=Math.floor(Math.random()*cats[k].length); }
+    render(true); buildOptions(); beep(740);
+  };
+  document.getElementById("reset").onclick=function(){
+    resetState(); render(true); buildOptions();
+  };
+
+  /* حفظ الصورة PNG */
+  document.getElementById("save").onclick=function(){
+    try{
+      var xml=new XMLSerializer().serializeToString(scene);
+      if(xml.indexOf("xmlns=")<0){xml=xml.replace("<svg",'<svg xmlns="'+NS+'"');}
+      var img=new Image();
+      img.onload=function(){
+        var c=document.createElement("canvas"); c.width=900; c.height=1200;
+        c.getContext("2d").drawImage(img,0,0,900,1200);
+        c.toBlob(function(blob){
+          var a=document.createElement("a");
+          a.href=URL.createObjectURL(blob); a.download="my-cat.png";
+          document.body.appendChild(a); a.click(); a.remove();
+          toast("تم حفظ الصورة ✨");
+        },"image/png");
+      };
+      img.onerror=function(){toast("مقدرتش أحفظ الصورة، جرّب screenshot");};
+      img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(xml);
+    }catch(e){toast("مقدرتش أحفظ الصورة، جرّب screenshot");}
+  };
+
+  buildTabs(); buildOptions(); render(false);
+})();
+</script>
+</body>
+</html>
